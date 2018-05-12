@@ -1,0 +1,4 @@
+The quick brown fox jumps over the lazy dog 100 times
+The quick brown fox jumps over the lazy dog X times
+The quick brown cow jumps over the lazy dog 100 times
+The quick brown cow jumps over the lazy dog 100

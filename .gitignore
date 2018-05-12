@@ -1,0 +1,7 @@
+*.sh
+dist/
+tmp/
+docker/
+match
+
+.vscode/
