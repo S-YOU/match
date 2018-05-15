@@ -13,7 +13,7 @@ class Matcher
   @tty : Bool = LibC.isatty(1) == 1
 
   def initialize
-    abort "Usage:\n\t#{PROGRAM_NAME} vars.conf TEMPLATE < INPUT_FILE\n" if ARGV.size < 2
+    abort "Usage:\n\t#{PROGRAM_NAME} vars.conf TEMPLATE INPUT_FILE\n" if ARGV.size < 3
     @buf = Pointer(UInt8).malloc(BUF_SIZE)
 
     load_vars
@@ -22,7 +22,7 @@ class Matcher
 
   def run : Void
     errors = skipped = processed = total = 0
-    content = ARGV.size > 2 ? read(ARGV[2]) : read
+    content = read(ARGV[2])
     elapsed = Time.measure do
       lines = content.split("\n")
       total = lines.size
@@ -32,7 +32,6 @@ class Matcher
         print_error if !ok && (status = @status)
       end
     end
-    print_stats
   end
 
   private macro basic_check
@@ -63,59 +62,16 @@ class Matcher
   end
 
   private macro print_error
-    if @tty
-      before = line.size - status.line.size
-      printf("[Line: \e[1;33m%d\e[0m] \e[96m%s\e[0m. Expected: \e[1;33m%s\e[0m\n", n, status.msg, status.keywords.join(", "))
-      puts line.size > 100 ? line[0..before + 20] + " ..." : line
-      if before >= line.size
-        puts " " + " " * before + "\e[0;31m" + "^^^\e[0m"
-      else
-        puts " " * before + "\e[0;31m" + "^" * status.line.split(" ")[0].size + "\e[0m"
-      end
-      errors += 1
-    else
-      print_error_plain
-    end
-  end
-
-  private macro print_stats
-    if @tty
-      printf("Total: \e[1;37m%d\e[0m lines, ", total) if total > processed
-      printf("Processed \e[1;33m%d\e[0m lines in \e[1;33m%0.3f\e[0m ms", processed, elapsed.nanoseconds / 1_000_000.0)
-      printf(", skipped \e[1;37m%d\e[0m lines", skipped) if skipped > 0
-      if errors > 0
-        printf(", found \e[1;41m %d \e[0m issue(s)\n", errors)
-        exit(1)
-      else
-        printf(", seems to be OK\n")
-      end
-    else
-      print_stats_plain
-    end
-  end
-
-  private macro print_error_plain
     before = line.size - status.line.size
-    printf("[Line: %d] %s. Expected: %s\n", n, status.msg, status.keywords.join(", "))
-    puts line.size > 100 ? line[0..before + 20] + " ..." : line
+    STDERR.printf("%s:%d:%d: **%s**\n", ARGV[2], n, before, status.msg)
+    STDERR.printf("Expected: **%s**\n", status.keywords.join(", "))
+    STDERR.printf("```\n%s\n", line.size > 100 ? line[0..before + 20] + " ..." : line)
     if before >= line.size
-      puts " " + " " * before + "" + "^^^"
+      STDERR.printf("%s\n", " " + " " * before + "" + "^^^")
     else
-      puts " " * before + "" + "^" * status.line.split(" ")[0].size + ""
+      STDERR.printf("%s\n```\n", " " * before + "" + "^" * status.line.split(" ")[0].size + "")
     end
     errors += 1
-  end
-
-  private macro print_stats_plain
-    printf("Total: %d lines, ", total) if total > processed
-    printf("Processed %d lines in %0.3f ms", processed, elapsed.nanoseconds / 1_000_000.0)
-    printf(", skipped %d lines", skipped) if skipped > 0
-    if errors > 0
-      printf(", found  %d  issue(s)\n", errors)
-      exit(1)
-    else
-      printf(", seems to be OK\n")
-    end
   end
 
   private def read(name : String) : String
@@ -124,12 +80,6 @@ class Matcher
     ret = LibC.read(fd, @buf, BUF_SIZE)
     raise "Cannot read #{name}\n" if ret < 0
     LibC.close(fd)
-    String.new(Slice.new(@buf, ret))
-  end
-
-  private def read : String
-    ret = LibC.read(0, @buf, BUF_SIZE)
-    raise "Cannot read stdin\n" unless ret > 0
     String.new(Slice.new(@buf, ret))
   end
 
